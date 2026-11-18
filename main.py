@@ -158,6 +158,15 @@ def forecast_case(case: dict, name: str) -> dict:
         raise ValueError(f"{name} has no hour-1 print")
     p1 = max(1.0, float(first["viewers"]))
 
+    # The case must ask for exactly hours 2-24. Fail loudly on a
+    # malformed case instead of silently writing a wrong-shaped output.
+    forecast_rows = case.get("forecast") or []
+    if [row.get("hour") for row in forecast_rows] != list(range(2, 25)):
+        raise ValueError(
+            f"{name} must ask for hours 2-24, got "
+            f"{[row.get('hour') for row in forecast_rows]}"
+        )
+
     # The pool: every comparable with a complete release day, sorted so
     # every sum below is byte-for-byte reproducible.
     launches = []
@@ -188,14 +197,14 @@ def forecast_case(case: dict, name: str) -> dict:
         return {
             "hours": [
                 {"hour": row["hour"], "q": fallback_quantiles(p1, row["hour"])}
-                for row in case["forecast"]
+                for row in forecast_rows
             ]
         }
 
     log_p1 = math.log(p1)
     log_h1 = [math.log(launch["h1"]) for launch in pool]
     hours = []
-    for row in case["forecast"]:
+    for row in forecast_rows:
         hour = row["hour"]
         log_ratios = [math.log(launch["day"][hour - 1] / launch["h1"]) for launch in pool]
         intercept, slope = ols(log_h1, log_ratios)
